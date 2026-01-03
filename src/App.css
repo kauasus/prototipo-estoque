@@ -1,0 +1,67 @@
+.login-area {
+  display: flex;
+  height: 100vh;
+  justify-content: center;
+  align-items: center;
+  background: #f5f7fa;
+}
+
+/* CARD */
+.login-card {
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 12px;
+  width: 360px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* HEADER */
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-icon {
+  font-size: 3rem;
+  color: #06b6d4;
+}
+
+.login-header h2 {
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+/* FORM */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* INPUTS */
+.login-input {
+  width: 100%;
+}
+
+/* BOTÃO */
+.login-button {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+
+
+
+/* PASSWORD PRIME REACT */
+.login-password {
+  width: 100%;
+}
+
+.login-password .p-inputtext {
+  width: 100%;
+}
+
+/* força o container interno */
+.p-password {
+  width: 100%;
+}
