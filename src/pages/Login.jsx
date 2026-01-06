@@ -19,7 +19,7 @@ export default function Login() {
 
 const handleLogin = async () => {
     setError('');
-    console.log(username, password);
+    /*console.log(username, password);*/
 
 
     if (!username || !password) {
@@ -42,6 +42,7 @@ const handleLogin = async () => {
       const data = await response.json();
 
       if (data.success) {
+        localStorage.setItem('logged', 'true')
         navigate('/dashboard');
       } else {
         setError(data.message);

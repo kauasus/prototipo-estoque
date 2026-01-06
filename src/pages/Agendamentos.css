@@ -1,0 +1,29 @@
+.agenda-container {
+  padding: 2rem;
+  width: 100%;
+}
+
+.agenda-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.agenda-card {
+  height: fit-content;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Responsivo */
+@media (max-width: 900px) {
+  .agenda-grid {
+    grid-template-columns: 1fr;
+  }
+}
