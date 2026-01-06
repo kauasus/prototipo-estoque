@@ -42,8 +42,8 @@ const handleLogin = async () => {
       const data = await response.json();
 
       if (data.success) {
-        localStorage.setItem('logged', 'true')
-        navigate('/dashboard');
+        localStorage.setItem('logged', 'true');
+        navigate('/dashboard');;
       } else {
         setError(data.message);
       }

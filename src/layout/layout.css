@@ -1,41 +1,11 @@
-/* Reseta margens para evitar scroll indesejado */
-html, body, #root {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    font-family: Arial, Helvetica, sans-serif;
-    background-color: #f5f5f5; /* Cor de fundo suave */
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Container principal que segura o Topbar e o Conteúdo */
-.layout-wrapper {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh; /* Ocupa a altura total da viewport */
-}
-
-/* O Header/Topbar não precisa de muito CSS extra pois o PrimeReact resolve, 
-   mas podemos dar um ajuste fino se precisar */
-.layout-topbar {
-    z-index: 999;
-}
-
-/* A área onde as páginas (Agendamentos, Dashboard) vão carregar */
-.layout-main {
-    flex: 1; /* Isso faz o conteúdo ocupar TODO o espaço restante */
-    padding: 1rem;
-    overflow-y: auto; /* Permite scroll apenas no conteúdo se for muito grande */
-    display: flex;
-    flex-direction: column;
-}
-
-/* Classe utilitária para os cards das páginas ocuparem 100% */
-.page-container {
-    background: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    flex: 1; /* Faz o card esticar até o final da tela */
-    display: flex;
-    flex-direction: column;
+.layout-content {
+  padding: 2rem;
+  background: #f5f7fa;
+  flex: 1;
 }
