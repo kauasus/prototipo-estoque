@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
-import { Dialog } from "primereact/dialog"; // popup pra criar e editar
+import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { InputNumber } from "primereact/inputnumber";
 import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
 import { Toast } from "primereact/toast";
 import { Toolbar } from "primereact/toolbar";
+import ImportarXML from "./ImportarXML";
 
 const ProdutosCRUD = () => {
   const [produtos, setProdutos] = useState([]);
@@ -37,6 +38,7 @@ const ProdutosCRUD = () => {
 
   const emptyProduto = {
     id: null,
+    codigo: "",
     nome: "",
     unidadeMedida: "",
     categoria: "",
@@ -50,7 +52,7 @@ const ProdutosCRUD = () => {
   };
 
   useEffect(() => {
-    const storedProdutos = localStorage.getItem("produtos"); // busca produtos salvos no localstorge
+    const storedProdutos = localStorage.getItem("produtos");
     if (storedProdutos) {
       setProdutos(JSON.parse(storedProdutos));
     }
@@ -118,6 +120,34 @@ const ProdutosCRUD = () => {
     });
   };
 
+  const importarProdutosXML = (produtosImportados) => {
+    let _produtos = [...produtos];
+
+    produtosImportados.forEach((produtoNovo) => {
+      // Verifica se já existe um produto com o mesmo código
+      const existe = _produtos.find(
+        (p) =>
+          p.codigo && produtoNovo.codigo && p.codigo === produtoNovo.codigo,
+      );
+
+      if (existe) {
+        // Se existe, atualiza o estoque (soma)
+        existe.estoqueAtual += produtoNovo.estoqueAtual;
+        toast.current.show({
+          severity: "info",
+          summary: "Estoque Atualizado",
+          detail: `${existe.nome} - Estoque: ${existe.estoqueAtual}`,
+          life: 3000,
+        });
+      } else {
+        // Se não existe, adiciona como novo
+        _produtos.push(produtoNovo);
+      }
+    });
+
+    saveProdutos(_produtos);
+  };
+
   const onInputChange = (e, name) => {
     const val = (e.target && e.target.value) || "";
     let _produto = { ...produto };
@@ -134,12 +164,15 @@ const ProdutosCRUD = () => {
 
   const leftToolbarTemplate = () => {
     return (
-      <Button
-        label="Novo Produto"
-        icon="pi pi-plus"
-        className="p-button-success"
-        onClick={openNew}
-      />
+      <div style={{ display: "flex", gap: "0.5rem" }}>
+        <Button
+          label="Novo Produto"
+          icon="pi pi-plus"
+          className="p-button-success"
+          onClick={openNew}
+        />
+        <ImportarXML onImportar={importarProdutosXML} />
+      </div>
     );
   };
 
@@ -204,6 +237,7 @@ const ProdutosCRUD = () => {
         dataKey="id"
         emptyMessage="Nenhum produto cadastrado"
       >
+        <Column field="codigo" header="Código" sortable />
         <Column field="nome" header="Produto" sortable />
         <Column field="unidadeMedida" header="Unidade" sortable />
         <Column field="categoria" header="Categoria" sortable />
@@ -238,6 +272,15 @@ const ProdutosCRUD = () => {
         onHide={hideDialog}
       >
         <div style={{ display: "grid", gap: "1rem" }}>
+          <div>
+            <label htmlFor="codigo">Código do Produto</label>
+            <InputText
+              id="codigo"
+              value={produto?.codigo}
+              onChange={(e) => onInputChange(e, "codigo")}
+            />
+          </div>
+
           <div>
             <label htmlFor="nome">Produto *</label>
             <InputText
