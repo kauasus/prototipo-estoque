@@ -7,223 +7,184 @@ import { InputText } from "primereact/inputtext";
 import { InputNumber } from "primereact/inputnumber";
 import { Dropdown } from "primereact/dropdown";
 import { Toast } from "primereact/toast";
-import { Toolbar } from "primereact/toolbar";
+import { Tag } from "primereact/tag";
 
 const MovimentacaoEstoque = () => {
   const [movimentacoes, setMovimentacoes] = useState([]);
   const [produtos, setProdutos] = useState([]);
-  const [dialogVisible, setDialogVisible] = useState(false);
-  const [movimentacao, setMovimentacao] = useState(null);
-  const toast = useRef(null);
-
-  const tiposMovimentacao = [
-    { label: "Entrada", value: "ENTRADA" },
-    { label: "Saída", value: "SAIDA" },
-  ];
-
-  const emptyMovimentacao = {
-    id: null,
-    tipo: "",
+  const [movimentacaoDialog, setMovimentacaoDialog] = useState(false);
+  const [movimentacao, setMovimentacao] = useState({
+    tipo: "ENTRADA",
     produtoId: null,
     quantidade: 0,
-    data: new Date(),
     observacao: "",
-  };
+  });
+  const toast = useRef(null);
 
   useEffect(() => {
-    const storedProdutos = localStorage.getItem("produtos");
-    const storedMovimentacoes = localStorage.getItem("movimentacoes");
-
-    if (storedProdutos) {
-      setProdutos(JSON.parse(storedProdutos));
-    }
-    if (storedMovimentacoes) {
-      setMovimentacoes(JSON.parse(storedMovimentacoes));
-    }
+    const movData = JSON.parse(localStorage.getItem("movimentacoes") || "[]");
+    const prodData = JSON.parse(localStorage.getItem("produtos") || "[]");
+    setMovimentacoes(movData);
+    setProdutos(prodData);
   }, []);
 
-  const openNew = () => {
-    setMovimentacao(emptyMovimentacao);
-    setDialogVisible(true);
-  };
-
-  const hideDialog = () => {
-    setDialogVisible(false);
-  };
-
   const saveMovimentacao = () => {
-    if (
-      movimentacao.tipo &&
-      movimentacao.produtoId &&
-      movimentacao.quantidade > 0
-    ) {
-      let _movimentacoes = [...movimentacoes];
-      let _movimentacao = { ...movimentacao, id: Date.now() };
-
-      // Atualizar estoque do produto
-      let _produtos = [...produtos];
-      const produtoIndex = _produtos.findIndex(
-        (p) => p.id === movimentacao.produtoId,
-      );
-
-      if (produtoIndex !== -1) {
-        if (movimentacao.tipo === "ENTRADA") {
-          _produtos[produtoIndex].estoqueAtual += movimentacao.quantidade;
-        } else {
-          _produtos[produtoIndex].estoqueAtual -= movimentacao.quantidade;
-        }
-
-        localStorage.setItem("produtos", JSON.stringify(_produtos));
-        setProdutos(_produtos);
-      }
-
-      _movimentacoes.push(_movimentacao);
-      localStorage.setItem("movimentacoes", JSON.stringify(_movimentacoes));
-      setMovimentacoes(_movimentacoes);
-
+    if (!movimentacao.produtoId || movimentacao.quantidade <= 0) {
       toast.current.show({
-        severity: "success",
-        summary: "Sucesso",
-        detail: `${movimentacao.tipo === "ENTRADA" ? "Entrada" : "Saída"} registrada`,
+        severity: "error",
+        summary: "Erro",
+        detail: "Preencha todos os campos corretamente",
       });
-
-      setDialogVisible(false);
-      setMovimentacao(emptyMovimentacao);
+      return;
     }
+
+    const prodIndex = produtos.findIndex(
+      (p) => p.id === movimentacao.produtoId,
+    );
+    const prod = { ...produtos[prodIndex] };
+
+    if (
+      movimentacao.tipo === "SAIDA" &&
+      prod.estoqueAtual < movimentacao.quantidade
+    ) {
+      toast.current.show({
+        severity: "error",
+        summary: "Erro",
+        detail: "Estoque insuficiente",
+      });
+      return;
+    }
+
+    // Atualiza estoque
+    if (movimentacao.tipo === "ENTRADA") {
+      prod.estoqueAtual += movimentacao.quantidade;
+    } else {
+      prod.estoqueAtual -= movimentacao.quantidade;
+    }
+
+    const novosProdutos = [...produtos];
+    novosProdutos[prodIndex] = prod;
+
+    const novaMov = {
+      ...movimentacao,
+      id: Date.now(),
+      data: new Date().toISOString(),
+      produtoNome: prod.nome,
+    };
+
+    const novasMovs = [novaMov, ...movimentacoes];
+
+    setProdutos(novosProdutos);
+    setMovimentacoes(novasMovs);
+    localStorage.setItem("produtos", JSON.stringify(novosProdutos));
+    localStorage.setItem("movimentacoes", JSON.stringify(novasMovs));
+
+    setMovimentacaoDialog(false);
+    toast.current.show({
+      severity: "success",
+      summary: "Sucesso",
+      detail: "Movimentação registrada",
+    });
   };
 
-  const onInputChange = (e, name) => {
-    const val = (e.target && e.target.value) || "";
-    let _movimentacao = { ...movimentacao };
-    _movimentacao[name] = val;
-    setMovimentacao(_movimentacao);
-  };
-
-  const onInputNumberChange = (e, name) => {
-    const val = e.value || 0;
-    let _movimentacao = { ...movimentacao };
-    _movimentacao[name] = val;
-    setMovimentacao(_movimentacao);
-  };
-
-  const leftToolbarTemplate = () => {
+  const tipoBodyTemplate = (rowData) => {
     return (
-      <Button
-        label="Nova Movimentação"
-        icon="pi pi-plus"
-        className="p-button-success"
-        onClick={openNew}
+      <Tag
+        value={rowData.tipo}
+        severity={rowData.tipo === "ENTRADA" ? "success" : "danger"}
       />
     );
   };
 
-  const tipoBodyTemplate = (rowData) => {
-    const color = rowData.tipo === "ENTRADA" ? "green" : "red";
-    return <span style={{ color, fontWeight: "bold" }}>{rowData.tipo}</span>;
-  };
-
-  const produtoBodyTemplate = (rowData) => {
-    const produto = produtos.find((p) => p.id === rowData.produtoId);
-    return produto ? produto.nome : "-";
-  };
-
-  const dataBodyTemplate = (rowData) => {
-    return new Date(rowData.data).toLocaleDateString("pt-BR");
-  };
-
-  const dialogFooter = (
-    <div>
-      <Button
-        label="Cancelar"
-        icon="pi pi-times"
-        className="p-button-text"
-        onClick={hideDialog}
-      />
-      <Button label="Salvar" icon="pi pi-check" onClick={saveMovimentacao} />
-    </div>
-  );
-
-  const produtosOptions = produtos.map((p) => ({ label: p.nome, value: p.id }));
-
   return (
     <div>
       <Toast ref={toast} />
-      <Toolbar
-        className="mb-4"
-        left={leftToolbarTemplate}
-        style={{ marginBottom: "1rem" }}
-      />
+      <div className="flex justify-content-between align-items-center mb-4">
+        <Button
+          label="Nova Movimentação"
+          icon="pi pi-plus"
+          onClick={() => setMovimentacaoDialog(true)}
+        />
+      </div>
 
       <DataTable
         value={movimentacoes}
         paginator
         rows={10}
-        dataKey="id"
-        emptyMessage="Nenhuma movimentação registrada"
+        sortField="data"
+        sortOrder={-1}
       >
-        <Column field="tipo" header="Tipo" body={tipoBodyTemplate} sortable />
         <Column
-          field="produtoId"
-          header="Produto"
-          body={produtoBodyTemplate}
+          field="data"
+          header="Data"
+          body={(d) => new Date(d.data).toLocaleString()}
           sortable
         />
-        <Column field="quantidade" header="Quantidade" sortable />
-        <Column field="data" header="Data" body={dataBodyTemplate} sortable />
-        <Column field="observacao" header="Observação" />
+        <Column field="tipo" header="Tipo" body={tipoBodyTemplate} sortable />
+        <Column field="produtoNome" header="Produto" sortable />
+        <Column field="quantidade" header="Qtd" sortable />
+        <Column field="observacao" header="Obs" />
       </DataTable>
 
       <Dialog
-        visible={dialogVisible}
-        style={{ width: "500px" }}
-        header="Nova Movimentação"
+        visible={movimentacaoDialog}
+        header="Registrar Movimentação"
         modal
-        className="p-fluid"
-        footer={dialogFooter}
-        onHide={hideDialog}
+        onHide={() => setMovimentacaoDialog(false)}
+        style={{ width: "450px" }}
       >
-        <div style={{ display: "grid", gap: "1rem" }}>
-          <div>
-            <label htmlFor="tipo">Tipo de Movimentação *</label>
+        <div className="p-fluid">
+          <div className="field mb-3">
+            <label>Tipo</label>
             <Dropdown
-              id="tipo"
-              value={movimentacao?.tipo}
-              options={tiposMovimentacao}
-              onChange={(e) => onInputChange(e, "tipo")}
-              placeholder="Selecione"
+              value={movimentacao.tipo}
+              options={[
+                { label: "Entrada", value: "ENTRADA" },
+                { label: "Saída", value: "SAIDA" },
+              ]}
+              onChange={(e) =>
+                setMovimentacao({ ...movimentacao, tipo: e.value })
+              }
             />
           </div>
-
-          <div>
-            <label htmlFor="produtoId">Produto *</label>
+          <div className="field mb-3">
+            <label>Produto</label>
             <Dropdown
-              id="produtoId"
-              value={movimentacao?.produtoId}
-              options={produtosOptions}
-              onChange={(e) => onInputChange(e, "produtoId")}
-              placeholder="Selecione"
+              value={movimentacao.produtoId}
+              options={produtos}
+              optionLabel="nome"
+              optionValue="id"
               filter
+              onChange={(e) =>
+                setMovimentacao({ ...movimentacao, produtoId: e.value })
+              }
+              placeholder="Selecione o produto"
             />
           </div>
-
-          <div>
-            <label htmlFor="quantidade">Quantidade *</label>
+          <div className="field mb-3">
+            <label>Quantidade</label>
             <InputNumber
-              id="quantidade"
-              value={movimentacao?.quantidade}
-              onValueChange={(e) => onInputNumberChange(e, "quantidade")}
+              value={movimentacao.quantidade}
+              onValueChange={(e) =>
+                setMovimentacao({ ...movimentacao, quantidade: e.value })
+              }
               min={1}
             />
           </div>
-
-          <div>
-            <label htmlFor="observacao">Observação</label>
+          <div className="field mb-3">
+            <label>Observação</label>
             <InputText
-              id="observacao"
-              value={movimentacao?.observacao}
-              onChange={(e) => onInputChange(e, "observacao")}
+              value={movimentacao.observacao}
+              onChange={(e) =>
+                setMovimentacao({ ...movimentacao, observacao: e.target.value })
+              }
             />
           </div>
+          <Button
+            label="Salvar"
+            icon="pi pi-check"
+            onClick={saveMovimentacao}
+          />
         </div>
       </Dialog>
     </div>

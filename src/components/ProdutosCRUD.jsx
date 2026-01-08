@@ -9,14 +9,22 @@ import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
 import { Toast } from "primereact/toast";
 import { Toolbar } from "primereact/toolbar";
+import { MultiSelect } from "primereact/multiselect";
+import { IconField } from "primereact/iconfield";
+import { InputIcon } from "primereact/inputicon";
 import ImportarXML from "./ImportarXML";
-
+import HistoricoProduto from "./HistoricoProduto";
 const ProdutosCRUD = () => {
   const [produtos, setProdutos] = useState([]);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [produto, setProduto] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [selectedCategorias, setSelectedCategorias] = useState(null);
+  const [historicoVisible, setHistoricoVisible] = useState(false);
+  const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const toast = useRef(null);
+  const dt = useRef(null);
 
   const unidadesMedida = [
     { label: "Unidade", value: "UN" },
@@ -120,18 +128,21 @@ const ProdutosCRUD = () => {
     });
   };
 
+  const verHistorico = (produto) => {
+    setProdutoSelecionado(produto.id);
+    setHistoricoVisible(true);
+  };
+
   const importarProdutosXML = (produtosImportados) => {
     let _produtos = [...produtos];
 
     produtosImportados.forEach((produtoNovo) => {
-      // Verifica se já existe um produto com o mesmo código
       const existe = _produtos.find(
         (p) =>
           p.codigo && produtoNovo.codigo && p.codigo === produtoNovo.codigo,
       );
 
       if (existe) {
-        // Se existe, atualiza o estoque (soma)
         existe.estoqueAtual += produtoNovo.estoqueAtual;
         toast.current.show({
           severity: "info",
@@ -140,7 +151,6 @@ const ProdutosCRUD = () => {
           life: 3000,
         });
       } else {
-        // Se não existe, adiciona como novo
         _produtos.push(produtoNovo);
       }
     });
@@ -162,6 +172,33 @@ const ProdutosCRUD = () => {
     setProduto(_produto);
   };
 
+  const exportExcel = () => {
+    import("xlsx").then((xlsx) => {
+      const worksheet = xlsx.utils.json_to_sheet(produtos);
+      const workbook = { Sheets: { data: worksheet }, SheetNames: ["data"] };
+      const excelBuffer = xlsx.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+      saveAsExcelFile(excelBuffer, "produtos");
+    });
+  };
+
+  const saveAsExcelFile = (buffer, fileName) => {
+    import("file-saver").then((module) => {
+      if (module && module.default) {
+        let EXCEL_TYPE =
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8";
+        let EXCEL_EXTENSION = ".xlsx";
+        const data = new Blob([buffer], { type: EXCEL_TYPE });
+        module.default.saveAs(
+          data,
+          fileName + "_export_" + new Date().getTime() + EXCEL_EXTENSION,
+        );
+      }
+    });
+  };
+
   const leftToolbarTemplate = () => {
     return (
       <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -176,9 +213,27 @@ const ProdutosCRUD = () => {
     );
   };
 
+  const rightToolbarTemplate = () => {
+    return (
+      <Button
+        label="Exportar Excel"
+        icon="pi pi-file-excel"
+        className="p-button-help"
+        onClick={exportExcel}
+      />
+    );
+  };
+
   const actionBodyTemplate = (rowData) => {
     return (
       <div style={{ display: "flex", gap: "0.5rem" }}>
+        <Button
+          icon="pi pi-history"
+          className="p-button-rounded p-button-info"
+          onClick={() => verHistorico(rowData)}
+          tooltip="Ver Histórico"
+          tooltipOptions={{ position: "top" }}
+        />
         <Button
           icon="pi pi-pencil"
           className="p-button-rounded p-button-warning"
@@ -209,6 +264,47 @@ const ProdutosCRUD = () => {
     );
   };
 
+  const header = (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "1rem",
+      }}
+    >
+      <div style={{ flex: 1 }}>
+        <IconField iconPosition="left">
+          <InputIcon className="pi pi-search" />
+          <InputText
+            type="search"
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            placeholder="Buscar produtos..."
+            style={{ width: "100%" }}
+          />
+        </IconField>
+      </div>
+      <div style={{ flex: 1 }}>
+        <MultiSelect
+          value={selectedCategorias}
+          options={categorias}
+          onChange={(e) => setSelectedCategorias(e.value)}
+          placeholder="Filtrar por Categoria"
+          maxSelectedLabels={2}
+          style={{ width: "100%" }}
+        />
+      </div>
+    </div>
+  );
+
+  const produtosFiltrados = produtos.filter((p) => {
+    if (selectedCategorias && selectedCategorias.length > 0) {
+      return selectedCategorias.includes(p.categoria);
+    }
+    return true;
+  });
+
   const dialogFooter = (
     <div>
       <Button
@@ -227,14 +323,18 @@ const ProdutosCRUD = () => {
       <Toolbar
         className="mb-4"
         left={leftToolbarTemplate}
+        right={rightToolbarTemplate}
         style={{ marginBottom: "1rem" }}
       />
 
       <DataTable
-        value={produtos}
+        ref={dt}
+        value={produtosFiltrados}
         paginator
         rows={10}
         dataKey="id"
+        globalFilter={globalFilter}
+        header={header}
         emptyMessage="Nenhum produto cadastrado"
       >
         <Column field="codigo" header="Código" sortable />
@@ -258,7 +358,7 @@ const ProdutosCRUD = () => {
         <Column
           body={actionBodyTemplate}
           exportable={false}
-          style={{ minWidth: "8rem" }}
+          style={{ minWidth: "10rem" }}
         />
       </DataTable>
 
@@ -388,6 +488,12 @@ const ProdutosCRUD = () => {
           </div>
         </div>
       </Dialog>
+
+      <HistoricoProduto
+        visible={historicoVisible}
+        onHide={() => setHistoricoVisible(false)}
+        produtoId={produtoSelecionado}
+      />
     </div>
   );
 };
