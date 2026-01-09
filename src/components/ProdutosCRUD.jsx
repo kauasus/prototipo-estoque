@@ -10,223 +10,310 @@ import { Calendar } from "primereact/calendar";
 import { Toast } from "primereact/toast";
 import { Toolbar } from "primereact/toolbar";
 import { MultiSelect } from "primereact/multiselect";
-import { IconField } from "primereact/iconfield";
-import { InputIcon } from "primereact/inputicon";
+import { FilterMatchMode } from "primereact/api";
 import ImportarXML from "./ImportarXML";
 import HistoricoProduto from "./HistoricoProduto";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+
 const ProdutosCRUD = () => {
   const [produtos, setProdutos] = useState([]);
-  const [dialogVisible, setDialogVisible] = useState(false);
+  const [produtoDialog, setProdutoDialog] = useState(false);
+  const [deleteProdutoDialog, setDeleteProdutoDialog] = useState(false);
   const [produto, setProduto] = useState(null);
   const [submitted, setSubmitted] = useState(false);
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [selectedCategorias, setSelectedCategorias] = useState(null);
+  const [globalFilterValue, setGlobalFilterValue] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState(null);
   const [historicoVisible, setHistoricoVisible] = useState(false);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
+  const [filters, setFilters] = useState({
+    global: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  });
   const toast = useRef(null);
-  const dt = useRef(null);
 
-  const unidadesMedida = [
-    { label: "Unidade", value: "UN" },
-    { label: "Caixa", value: "CX" },
-    { label: "Pacote", value: "PC" },
-    { label: "Quilograma", value: "KG" },
-    { label: "Litro", value: "L" },
-    { label: "Metro", value: "M" },
+  const unidades = [
+    { label: "Unidade (UN)", value: "UN" },
+    { label: "Caixa (CX)", value: "CX" },
+    { label: "Peça (PC)", value: "PC" },
+    { label: "Quilograma (KG)", value: "KG" },
+    { label: "Litro (L)", value: "L" },
+    { label: "Metro (M)", value: "M" },
   ];
 
   const categorias = [
-    { label: "Alimentos", value: "ALIMENTOS" },
-    { label: "Bebidas", value: "BEBIDAS" },
-    { label: "Limpeza", value: "LIMPEZA" },
-    { label: "Higiene", value: "HIGIENE" },
-    { label: "Eletrônicos", value: "ELETRONICOS" },
-    { label: "Outros", value: "OUTROS" },
+    { label: "Alimentos", value: "Alimentos" },
+    { label: "Bebidas", value: "Bebidas" },
+    { label: "Limpeza", value: "Limpeza" },
+    { label: "Higiene", value: "Higiene" },
+    { label: "Eletrônicos", value: "Eletrônicos" },
+    { label: "Outros", value: "Outros" },
   ];
 
   const emptyProduto = {
     id: null,
     codigo: "",
     nome: "",
-    unidadeMedida: "",
     categoria: "",
+    unidadeMedida: "UN",
     precoCompra: 0,
+    precoVenda: 0,
     estoqueMin: 0,
     estoqueMax: 0,
     estoqueAtual: 0,
-    localizacao: "",
     validade: null,
-    fabricante: "",
+    fornecedor: "",
+    fotoUrl: "",
+    localizacao: "",
   };
 
   useEffect(() => {
-    const storedProdutos = localStorage.getItem("produtos");
-    if (storedProdutos) {
-      setProdutos(JSON.parse(storedProdutos));
+    const savedProdutos = localStorage.getItem("produtos");
+    if (savedProdutos) {
+      setProdutos(JSON.parse(savedProdutos));
     }
   }, []);
 
-  const saveProdutos = (prods) => {
-    localStorage.setItem("produtos", JSON.stringify(prods));
-    setProdutos(prods);
-  };
+  useEffect(() => {
+    if (produtos.length > 0) {
+      localStorage.setItem("produtos", JSON.stringify(produtos));
+    }
+  }, [produtos]);
 
   const openNew = () => {
     setProduto(emptyProduto);
     setSubmitted(false);
-    setDialogVisible(true);
+    setProdutoDialog(true);
   };
 
   const hideDialog = () => {
     setSubmitted(false);
-    setDialogVisible(false);
+    setProdutoDialog(false);
+  };
+
+  const hideDeleteProdutoDialog = () => {
+    setDeleteProdutoDialog(false);
   };
 
   const saveProduto = () => {
     setSubmitted(true);
 
-    if (produto.nome.trim() && produto.unidadeMedida && produto.categoria) {
+    if (produto.nome.trim() && produto.categoria) {
       let _produtos = [...produtos];
-      let _produto = { ...produto };
 
       if (produto.id) {
         const index = _produtos.findIndex((p) => p.id === produto.id);
-        _produtos[index] = _produto;
+        _produtos[index] = produto;
         toast.current.show({
           severity: "success",
           summary: "Sucesso",
           detail: "Produto atualizado",
+          life: 3000,
         });
       } else {
-        _produto.id = Date.now();
-        _produtos.push(_produto);
+        produto.id = Date.now();
+        _produtos.push(produto);
         toast.current.show({
           severity: "success",
           summary: "Sucesso",
-          detail: "Produto criado",
+          detail: "Produto cadastrado",
+          life: 3000,
         });
       }
 
-      saveProdutos(_produtos);
-      setDialogVisible(false);
+      setProdutos(_produtos);
+      setProdutoDialog(false);
       setProduto(emptyProduto);
     }
   };
 
   const editProduto = (produto) => {
     setProduto({ ...produto });
-    setDialogVisible(true);
+    setProdutoDialog(true);
   };
 
-  const deleteProduto = (produto) => {
+  const confirmDeleteProduto = (produto) => {
+    setProduto(produto);
+    setDeleteProdutoDialog(true);
+  };
+
+  const deleteProduto = () => {
     let _produtos = produtos.filter((p) => p.id !== produto.id);
-    saveProdutos(_produtos);
+    setProdutos(_produtos);
+    setDeleteProdutoDialog(false);
+    setProduto(emptyProduto);
     toast.current.show({
       severity: "success",
       summary: "Sucesso",
       detail: "Produto excluído",
+      life: 3000,
     });
-  };
-
-  const verHistorico = (produto) => {
-    setProdutoSelecionado(produto.id);
-    setHistoricoVisible(true);
-  };
-
-  const importarProdutosXML = (produtosImportados) => {
-    let _produtos = [...produtos];
-
-    produtosImportados.forEach((produtoNovo) => {
-      const existe = _produtos.find(
-        (p) =>
-          p.codigo && produtoNovo.codigo && p.codigo === produtoNovo.codigo,
-      );
-
-      if (existe) {
-        existe.estoqueAtual += produtoNovo.estoqueAtual;
-        toast.current.show({
-          severity: "info",
-          summary: "Estoque Atualizado",
-          detail: `${existe.nome} - Estoque: ${existe.estoqueAtual}`,
-          life: 3000,
-        });
-      } else {
-        _produtos.push(produtoNovo);
-      }
-    });
-
-    saveProdutos(_produtos);
   };
 
   const onInputChange = (e, name) => {
     const val = (e.target && e.target.value) || "";
     let _produto = { ...produto };
-    _produto[name] = val;
+    _produto[`${name}`] = val;
     setProduto(_produto);
   };
 
   const onInputNumberChange = (e, name) => {
     const val = e.value || 0;
     let _produto = { ...produto };
-    _produto[name] = val;
+    _produto[`${name}`] = val;
     setProduto(_produto);
   };
 
-  const exportExcel = () => {
-    import("xlsx").then((xlsx) => {
-      const worksheet = xlsx.utils.json_to_sheet(produtos);
-      const workbook = { Sheets: { data: worksheet }, SheetNames: ["data"] };
-      const excelBuffer = xlsx.write(workbook, {
-        bookType: "xlsx",
-        type: "array",
-      });
-      saveAsExcelFile(excelBuffer, "produtos");
+  const onCategoryChange = (e) => {
+    let _produto = { ...produto };
+    _produto["categoria"] = e.value;
+    setProduto(_produto);
+  };
+
+  const onUnidadeChange = (e) => {
+    let _produto = { ...produto };
+    _produto["unidadeMedida"] = e.value;
+    setProduto(_produto);
+  };
+
+  const onDateChange = (e) => {
+    let _produto = { ...produto };
+    _produto["validade"] = e.value;
+    setProduto(_produto);
+  };
+
+  const onGlobalFilterChange = (e) => {
+    const value = e.target.value;
+    let _filters = { ...filters };
+    _filters["global"].value = value;
+    setFilters(_filters);
+    setGlobalFilterValue(value);
+  };
+
+  const importarProdutosXML = (produtosImportados, fornecedorNF) => {
+    console.log("Recebendo produtos:", produtosImportados);
+    console.log("Recebendo fornecedor:", fornecedorNF);
+
+    // Cadastra o fornecedor automaticamente se existir
+    if (fornecedorNF && window.adicionarFornecedor) {
+      window.adicionarFornecedor(fornecedorNF);
+    }
+
+    let novos = 0;
+    let atualizados = 0;
+
+    produtosImportados.forEach((produtoImportado) => {
+      const produtoExistente = produtos.find(
+        (p) =>
+          p.codigo &&
+          produtoImportado.codigo &&
+          p.codigo === produtoImportado.codigo,
+      );
+
+      if (produtoExistente) {
+        const index = produtos.findIndex((p) => p.id === produtoExistente.id);
+        const produtoAtualizado = {
+          ...produtoExistente,
+          estoqueAtual:
+            produtoExistente.estoqueAtual + produtoImportado.estoqueAtual,
+          precoCompra: produtoImportado.precoCompra,
+          fornecedor: produtoImportado.fornecedor,
+        };
+
+        const _produtos = [...produtos];
+        _produtos[index] = produtoAtualizado;
+        setProdutos(_produtos);
+        atualizados++;
+      } else {
+        setProdutos((prev) => [...prev, produtoImportado]);
+        novos++;
+      }
+    });
+
+    toast.current.show({
+      severity: "success",
+      summary: "Importação Concluída",
+      detail: `${novos} produto(s) novo(s) e ${atualizados} atualizado(s)`,
+      life: 4000,
     });
   };
 
-  const saveAsExcelFile = (buffer, fileName) => {
-    import("file-saver").then((module) => {
-      if (module && module.default) {
-        let EXCEL_TYPE =
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8";
-        let EXCEL_EXTENSION = ".xlsx";
-        const data = new Blob([buffer], { type: EXCEL_TYPE });
-        module.default.saveAs(
-          data,
-          fileName + "_export_" + new Date().getTime() + EXCEL_EXTENSION,
-        );
-      }
+  const exportExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(produtos);
+    const workbook = {
+      Sheets: { Produtos: worksheet },
+      SheetNames: ["Produtos"],
+    };
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
     });
+    const data = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    saveAs(
+      data,
+      `produtos_${new Date().toLocaleDateString("pt-BR").replace(/\//g, "-")}.xlsx`,
+    );
+  };
+
+  const verHistorico = (produto) => {
+    setProdutoSelecionado(produto);
+    setHistoricoVisible(true);
   };
 
   const leftToolbarTemplate = () => {
     return (
-      <div style={{ display: "flex", gap: "0.5rem" }}>
+      <div className="flex flex-wrap gap-2">
         <Button
           label="Novo Produto"
           icon="pi pi-plus"
           className="p-button-success"
           onClick={openNew}
         />
-        <ImportarXML onImportar={importarProdutosXML} />
+        <ImportarXML onImport={importarProdutosXML} />
       </div>
     );
   };
 
   const rightToolbarTemplate = () => {
     return (
-      <Button
-        label="Exportar Excel"
-        icon="pi pi-file-excel"
-        className="p-button-help"
-        onClick={exportExcel}
-      />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          label="Exportar Excel"
+          icon="pi pi-file-excel"
+          className="p-button-success"
+          onClick={exportExcel}
+          disabled={produtos.length === 0}
+        />
+      </div>
+    );
+  };
+
+  const priceBodyTemplate = (rowData) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(rowData.precoVenda);
+  };
+
+  const stockBodyTemplate = (rowData) => {
+    const isLowStock = rowData.estoqueAtual <= rowData.estoqueMin;
+    return (
+      <span
+        style={{
+          color: isLowStock ? "red" : "green",
+          fontWeight: "bold",
+        }}
+      >
+        {rowData.estoqueAtual} {rowData.unidadeMedida}
+        {isLowStock && " ⚠️"}
+      </span>
     );
   };
 
   const actionBodyTemplate = (rowData) => {
     return (
-      <div style={{ display: "flex", gap: "0.5rem" }}>
+      <div className="flex gap-2">
         <Button
           icon="pi pi-history"
           className="p-button-rounded p-button-info"
@@ -238,191 +325,204 @@ const ProdutosCRUD = () => {
           icon="pi pi-pencil"
           className="p-button-rounded p-button-warning"
           onClick={() => editProduto(rowData)}
+          tooltip="Editar"
+          tooltipOptions={{ position: "top" }}
         />
         <Button
           icon="pi pi-trash"
           className="p-button-rounded p-button-danger"
-          onClick={() => deleteProduto(rowData)}
+          onClick={() => confirmDeleteProduto(rowData)}
+          tooltip="Excluir"
+          tooltipOptions={{ position: "top" }}
         />
       </div>
-    );
-  };
-
-  const priceBodyTemplate = (rowData) => {
-    return `R$ ${rowData.precoCompra.toFixed(2)}`;
-  };
-
-  const estoqueBodyTemplate = (rowData) => {
-    const color =
-      rowData.estoqueAtual <= rowData.estoqueMin
-        ? "red"
-        : rowData.estoqueAtual >= rowData.estoqueMax
-          ? "orange"
-          : "green";
-    return (
-      <span style={{ color, fontWeight: "bold" }}>{rowData.estoqueAtual}</span>
     );
   };
 
   const header = (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: "1rem",
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        <IconField iconPosition="left">
-          <InputIcon className="pi pi-search" />
-          <InputText
-            type="search"
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            placeholder="Buscar produtos..."
-            style={{ width: "100%" }}
-          />
-        </IconField>
-      </div>
-      <div style={{ flex: 1 }}>
+    <div className="flex flex-wrap gap-2 align-items-center justify-content-between">
+      <h4 className="m-0">📦 Gerenciar Produtos</h4>
+      <div className="flex gap-2">
         <MultiSelect
-          value={selectedCategorias}
+          value={selectedCategories}
           options={categorias}
-          onChange={(e) => setSelectedCategorias(e.value)}
+          onChange={(e) => setSelectedCategories(e.value)}
           placeholder="Filtrar por Categoria"
           maxSelectedLabels={2}
-          style={{ width: "100%" }}
+          style={{ minWidth: "200px" }}
         />
+        <span className="p-input-icon-left">
+          <i className="pi pi-search" />
+          <InputText
+            value={globalFilterValue}
+            onChange={onGlobalFilterChange}
+            placeholder="Buscar produto..."
+          />
+        </span>
       </div>
     </div>
   );
 
-  const produtosFiltrados = produtos.filter((p) => {
-    if (selectedCategorias && selectedCategorias.length > 0) {
-      return selectedCategorias.includes(p.categoria);
-    }
-    return true;
-  });
-
-  const dialogFooter = (
-    <div>
+  const produtoDialogFooter = (
+    <>
       <Button
         label="Cancelar"
         icon="pi pi-times"
         className="p-button-text"
         onClick={hideDialog}
       />
-      <Button label="Salvar" icon="pi pi-check" onClick={saveProduto} />
-    </div>
+      <Button
+        label="Salvar"
+        icon="pi pi-check"
+        className="p-button-success"
+        onClick={saveProduto}
+      />
+    </>
   );
+
+  const deleteProdutoDialogFooter = (
+    <>
+      <Button
+        label="Não"
+        icon="pi pi-times"
+        className="p-button-text"
+        onClick={hideDeleteProdutoDialog}
+      />
+      <Button
+        label="Sim"
+        icon="pi pi-check"
+        className="p-button-danger"
+        onClick={deleteProduto}
+      />
+    </>
+  );
+
+  const filteredProdutos =
+    selectedCategories && selectedCategories.length > 0
+      ? produtos.filter((p) => selectedCategories.includes(p.categoria))
+      : produtos;
 
   return (
     <div>
       <Toast ref={toast} />
+
       <Toolbar
         className="mb-4"
         left={leftToolbarTemplate}
         right={rightToolbarTemplate}
-        style={{ marginBottom: "1rem" }}
       />
 
       <DataTable
-        ref={dt}
-        value={produtosFiltrados}
+        value={filteredProdutos}
         paginator
         rows={10}
         dataKey="id"
-        globalFilter={globalFilter}
+        filters={filters}
+        globalFilterFields={["codigo", "nome", "categoria", "fornecedor"]}
         header={header}
         emptyMessage="Nenhum produto cadastrado"
+        responsiveLayout="scroll"
       >
-        <Column field="codigo" header="Código" sortable />
-        <Column field="nome" header="Produto" sortable />
-        <Column field="unidadeMedida" header="Unidade" sortable />
-        <Column field="categoria" header="Categoria" sortable />
         <Column
-          field="precoCompra"
-          header="Preço Compra"
+          field="codigo"
+          header="Código"
+          sortable
+          style={{ minWidth: "120px" }}
+        />
+        <Column
+          field="nome"
+          header="Produto"
+          sortable
+          style={{ minWidth: "200px" }}
+        />
+        <Column field="categoria" header="Categoria" sortable />
+        <Column field="unidadeMedida" header="UN" />
+        <Column
+          field="precoVenda"
+          header="Preço"
           body={priceBodyTemplate}
           sortable
         />
         <Column
           field="estoqueAtual"
           header="Estoque"
-          body={estoqueBodyTemplate}
+          body={stockBodyTemplate}
           sortable
         />
-        <Column field="localizacao" header="Localização" sortable />
-        <Column field="fabricante" header="Fabricante" sortable />
+        <Column
+          field="fornecedor"
+          header="Fornecedor"
+          sortable
+          style={{ minWidth: "150px" }}
+        />
         <Column
           body={actionBodyTemplate}
           exportable={false}
-          style={{ minWidth: "10rem" }}
+          style={{ minWidth: "180px" }}
         />
       </DataTable>
 
       <Dialog
-        visible={dialogVisible}
-        style={{ width: "600px" }}
-        header="Detalhes do Produto"
+        visible={produtoDialog}
+        style={{ width: "700px" }}
+        header="📋 Dados do Produto"
         modal
         className="p-fluid"
-        footer={dialogFooter}
+        footer={produtoDialogFooter}
         onHide={hideDialog}
       >
-        <div style={{ display: "grid", gap: "1rem" }}>
-          <div>
-            <label htmlFor="codigo">Código do Produto</label>
+        <div className="formgrid grid">
+          <div className="field col-12 md:col-6">
+            <label htmlFor="codigo">Código</label>
             <InputText
               id="codigo"
-              value={produto?.codigo}
+              value={produto?.codigo || ""}
               onChange={(e) => onInputChange(e, "codigo")}
             />
           </div>
 
-          <div>
-            <label htmlFor="nome">Produto *</label>
+          <div className="field col-12 md:col-6">
+            <label htmlFor="nome">Nome do Produto *</label>
             <InputText
               id="nome"
-              value={produto?.nome}
+              value={produto?.nome || ""}
               onChange={(e) => onInputChange(e, "nome")}
               required
               className={submitted && !produto?.nome ? "p-invalid" : ""}
             />
+            {submitted && !produto?.nome && (
+              <small className="p-error">Nome é obrigatório.</small>
+            )}
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "1rem",
-            }}
-          >
-            <div>
-              <label htmlFor="unidadeMedida">Unidade de Medida *</label>
-              <Dropdown
-                id="unidadeMedida"
-                value={produto?.unidadeMedida}
-                options={unidadesMedida}
-                onChange={(e) => onInputChange(e, "unidadeMedida")}
-                placeholder="Selecione"
-              />
-            </div>
-            <div>
-              <label htmlFor="categoria">Categoria *</label>
-              <Dropdown
-                id="categoria"
-                value={produto?.categoria}
-                options={categorias}
-                onChange={(e) => onInputChange(e, "categoria")}
-                placeholder="Selecione"
-              />
-            </div>
+          <div className="field col-12 md:col-6">
+            <label htmlFor="categoria">Categoria *</label>
+            <Dropdown
+              id="categoria"
+              value={produto?.categoria}
+              options={categorias}
+              onChange={onCategoryChange}
+              placeholder="Selecione uma categoria"
+              className={submitted && !produto?.categoria ? "p-invalid" : ""}
+            />
+            {submitted && !produto?.categoria && (
+              <small className="p-error">Categoria é obrigatória.</small>
+            )}
           </div>
 
-          <div>
-            <label htmlFor="precoCompra">Preço de Compra</label>
+          <div className="field col-12 md:col-6">
+            <label htmlFor="unidadeMedida">Unidade de Medida</label>
+            <Dropdown
+              id="unidadeMedida"
+              value={produto?.unidadeMedida}
+              options={unidades}
+              onChange={onUnidadeChange}
+              placeholder="Selecione"
+            />
+          </div>
+
+          <div className="field col-12 md:col-6">
+            <label htmlFor="precoCompra">Preço de Compra (R$)</label>
             <InputNumber
               id="precoCompra"
               value={produto?.precoCompra}
@@ -433,66 +533,111 @@ const ProdutosCRUD = () => {
             />
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "1rem",
-            }}
-          >
-            <div>
-              <label htmlFor="estoqueMin">Estoque Mínimo</label>
-              <InputNumber
-                id="estoqueMin"
-                value={produto?.estoqueMin}
-                onValueChange={(e) => onInputNumberChange(e, "estoqueMin")}
-              />
-            </div>
-            <div>
-              <label htmlFor="estoqueMax">Estoque Máximo</label>
-              <InputNumber
-                id="estoqueMax"
-                value={produto?.estoqueMax}
-                onValueChange={(e) => onInputNumberChange(e, "estoqueMax")}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="localizacao">Localização</label>
-            <InputText
-              id="localizacao"
-              value={produto?.localizacao}
-              onChange={(e) => onInputChange(e, "localizacao")}
+          <div className="field col-12 md:col-6">
+            <label htmlFor="precoVenda">Preço de Venda (R$)</label>
+            <InputNumber
+              id="precoVenda"
+              value={produto?.precoVenda}
+              onValueChange={(e) => onInputNumberChange(e, "precoVenda")}
+              mode="currency"
+              currency="BRL"
+              locale="pt-BR"
             />
           </div>
 
-          <div>
-            <label htmlFor="validade">Validade</label>
+          <div className="field col-12 md:col-4">
+            <label htmlFor="estoqueMin">Estoque Mínimo</label>
+            <InputNumber
+              id="estoqueMin"
+              value={produto?.estoqueMin}
+              onValueChange={(e) => onInputNumberChange(e, "estoqueMin")}
+            />
+          </div>
+
+          <div className="field col-12 md:col-4">
+            <label htmlFor="estoqueMax">Estoque Máximo</label>
+            <InputNumber
+              id="estoqueMax"
+              value={produto?.estoqueMax}
+              onValueChange={(e) => onInputNumberChange(e, "estoqueMax")}
+            />
+          </div>
+
+          <div className="field col-12 md:col-4">
+            <label htmlFor="estoqueAtual">Estoque Atual</label>
+            <InputNumber
+              id="estoqueAtual"
+              value={produto?.estoqueAtual}
+              onValueChange={(e) => onInputNumberChange(e, "estoqueAtual")}
+            />
+          </div>
+
+          <div className="field col-12 md:col-6">
+            <label htmlFor="validade">Data de Validade</label>
             <Calendar
               id="validade"
               value={produto?.validade}
-              onChange={(e) => onInputChange(e, "validade")}
+              onChange={onDateChange}
               dateFormat="dd/mm/yy"
               showIcon
             />
           </div>
 
-          <div>
-            <label htmlFor="fabricante">Fabricante</label>
+          <div className="field col-12 md:col-6">
+            <label htmlFor="fornecedor">Fornecedor</label>
             <InputText
-              id="fabricante"
-              value={produto?.fabricante}
-              onChange={(e) => onInputChange(e, "fabricante")}
+              id="fornecedor"
+              value={produto?.fornecedor || ""}
+              onChange={(e) => onInputChange(e, "fornecedor")}
             />
           </div>
+
+          <div className="field col-12 md:col-6">
+            <label htmlFor="localizacao">Localização</label>
+            <InputText
+              id="localizacao"
+              value={produto?.localizacao || ""}
+              onChange={(e) => onInputChange(e, "localizacao")}
+              placeholder="Ex: Corredor 3, Prateleira B"
+            />
+          </div>
+
+          <div className="field col-12 md:col-6">
+            <label htmlFor="fotoUrl">URL da Foto</label>
+            <InputText
+              id="fotoUrl"
+              value={produto?.fotoUrl || ""}
+              onChange={(e) => onInputChange(e, "fotoUrl")}
+            />
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        visible={deleteProdutoDialog}
+        style={{ width: "450px" }}
+        header="⚠️ Confirmar Exclusão"
+        modal
+        footer={deleteProdutoDialogFooter}
+        onHide={hideDeleteProdutoDialog}
+      >
+        <div className="confirmation-content">
+          <i
+            className="pi pi-exclamation-triangle mr-3"
+            style={{ fontSize: "2rem" }}
+          />
+          {produto && (
+            <span>
+              Tem certeza que deseja excluir <b>{produto.nome}</b>?
+            </span>
+          )}
         </div>
       </Dialog>
 
       <HistoricoProduto
         visible={historicoVisible}
         onHide={() => setHistoricoVisible(false)}
-        produtoId={produtoSelecionado}
+        produto={produtoSelecionado}
       />
     </div>
   );

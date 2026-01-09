@@ -9,9 +9,9 @@
 /* CARD */
 .login-card {
   background: #ffffff;
-  padding: 2rem;
+  padding: 4rem;
   border-radius: 12px;
-  width: 360px;
+  width: 315px;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 }
 
@@ -48,9 +48,6 @@
   width: 100%;
   margin-top: 0.5rem;
 }
-
-
-
 
 /* PASSWORD PRIME REACT */
 .login-password {
